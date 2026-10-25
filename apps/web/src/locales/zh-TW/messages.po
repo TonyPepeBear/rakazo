@@ -5148,7 +5148,7 @@ msgstr "類型"
 
 #: src/components/teach/TeachRecordingChrome.tsx
 msgid "Type without recording"
-msgstr "改用文字輸入，不錄音"
+msgstr "輸入文字但不記錄內容"
 
 #: src/components/AskCard.tsx
 msgid "Type your answer"
