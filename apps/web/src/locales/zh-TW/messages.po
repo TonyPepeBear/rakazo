@@ -52,7 +52,7 @@ msgid "{0} (over {1})"
 msgstr "{0}（超過 {1}）"
 
 #. placeholder {0}: preset.n
-#: src/pages/RoutineSchedule.tsx
+#: src/lib/cron.ts
 msgid "{0} {unitLabel}"
 msgstr "{0} {unitLabel}"
 
@@ -154,6 +154,10 @@ msgstr "{days} 天前"
 #: src/components/markdown-copy.tsx
 msgid "{from}–{to} of {total} rows"
 msgstr "第 {from}–{to} 列，共 {total} 列"
+
+#: src/lib/cron.ts
+msgid "{fromName} to {toName}"
+msgstr "{fromName}至{toName}"
 
 #: src/components/markdown-copy.tsx
 msgid "{header}, column {index}"
@@ -799,7 +803,7 @@ msgid "Ask"
 msgstr ""
 
 #. placeholder {0}: preset.time
-#: src/pages/RoutineSchedule.tsx
+#: src/lib/cron.ts
 msgid "at {0}"
 msgstr "{0}"
 
@@ -2139,7 +2143,7 @@ msgstr ""
 msgid "Credit amount"
 msgstr "額度金額"
 
-#: src/pages/RoutineSchedule.tsx
+#: src/lib/cron.ts
 msgid "Cron"
 msgstr "Cron"
 
@@ -2177,7 +2181,7 @@ msgid "Dark"
 msgstr "深色"
 
 #: src/lib/billing.ts
-#: src/pages/RoutineSchedule.tsx
+#: src/lib/cron.ts
 msgid "day"
 msgstr "天"
 
@@ -2185,7 +2189,7 @@ msgstr "天"
 msgid "Day-to-day work"
 msgstr "日常工作"
 
-#: src/pages/RoutineSchedule.tsx
+#: src/lib/cron.ts
 msgid "days"
 msgstr "天"
 
@@ -2550,10 +2554,21 @@ msgstr "錯誤"
 msgid "Error details"
 msgstr "錯誤詳細資訊"
 
+#: src/lib/cron.ts
 #: src/pages/ExternalConversationSettings.tsx
-#: src/pages/RoutineSchedule.tsx
 msgid "Every"
 msgstr "每"
+
+#. placeholder {0}: names[0] ?? ""
+#: src/lib/cron.ts
+msgid "Every {0}"
+msgstr "每{0}"
+
+#. placeholder {0}: names.slice(0, -1).join(", ")
+#. placeholder {1}: names.at(-1) ?? ""
+#: src/lib/cron.ts
+msgid "Every {0} and {1}"
+msgstr "每{0}和{1}"
 
 #: src/pages/RoutineSchedule.tsx
 msgid "every {intervalAmountSelect} {intervalUnitSelect}"
@@ -2563,17 +2578,24 @@ msgstr "每 {intervalAmountSelect} {intervalUnitSelect}"
 msgid "Every bot in this space reads these notes and keeps them up to date."
 msgstr ""
 
+#: src/lib/cron.ts
 #: src/pages/RoutineEditor.tsx
 #: src/pages/RoutineSchedule.tsx
 msgid "Every day"
 msgstr "每天"
 
+#: src/lib/cron.ts
 #: src/pages/RoutineEditor.tsx
 #: src/pages/RoutineSchedule.tsx
 msgid "Every hour"
 msgstr "每小時"
 
-#: src/pages/RoutineSchedule.tsx
+#. placeholder {0}: String(minute).padStart(2, "0")
+#: src/lib/cron.ts
+msgid "Every hour at :{0}"
+msgstr "每小時 {0} 分"
+
+#: src/lib/cron.ts
 msgid "Every Monday"
 msgstr "每週一"
 
@@ -2734,6 +2756,10 @@ msgstr "忘記密碼？"
 msgid "Free"
 msgstr "免費"
 
+#: src/lib/cron.ts
+msgid "Friday"
+msgstr "週五"
+
 #: src/pages/ActivityList.tsx
 msgid "From"
 msgstr "從"
@@ -2853,12 +2879,12 @@ msgstr "按住說話"
 msgid "Hold to talk, release to send"
 msgstr "按住說話，放開傳送"
 
-#: src/pages/RoutineSchedule.tsx
+#: src/lib/cron.ts
 msgid "hour"
 msgstr "小時"
 
+#: src/lib/cron.ts
 #: src/pages/ExternalConversationSettings.tsx
-#: src/pages/RoutineSchedule.tsx
 msgid "hours"
 msgstr "小時"
 
@@ -3437,12 +3463,12 @@ msgstr "最小化機器人面板"
 msgid "Minimize call"
 msgstr "最小化通話"
 
-#: src/pages/RoutineSchedule.tsx
+#: src/lib/cron.ts
 msgid "minute"
 msgstr "分鐘"
 
+#: src/lib/cron.ts
 #: src/pages/RoutineEditor.tsx
-#: src/pages/RoutineSchedule.tsx
 msgid "minutes"
 msgstr "分鐘"
 
@@ -3501,11 +3527,15 @@ msgstr "來自伺服器的模型"
 msgid "Models list OK. {modelCount, plural, one {# model} other {# models}} available. Chat was not tested."
 msgstr "模型清單正常。{modelCount, plural, one {# 個模型} other {# 個模型}}可用。未測試聊天。"
 
+#: src/lib/cron.ts
+msgid "Monday"
+msgstr "週一"
+
 #: src/lib/billing.ts
 msgid "month"
 msgstr "月"
 
-#: src/pages/RoutineSchedule.tsx
+#: src/lib/cron.ts
 msgid "Monthly"
 msgstr "每月"
 
@@ -3866,10 +3896,18 @@ msgstr "Ollama Cloud"
 msgid "On a schedule"
 msgstr "依排程"
 
+#: src/lib/cron.ts
+msgid "on day {day} at {time}"
+msgstr "{day} 日 {time}"
+
 #. placeholder {0}: preset.time
-#: src/pages/RoutineSchedule.tsx
+#: src/lib/cron.ts
 msgid "on the 1st at {0}"
 msgstr "每月 1 日 {0}"
+
+#: src/lib/cron.ts
+msgid "One-time"
+msgstr "一次性"
 
 #: src/components/ModelCredits.tsx
 msgid "One-time purchase. Credits do not expire."
@@ -4619,6 +4657,10 @@ msgstr "執行"
 msgid "Runs when this bot receives a verified message from this provider."
 msgstr "當此機器人收到來自這個供應商且通過驗證的訊息時執行。"
 
+#: src/lib/cron.ts
+msgid "Saturday"
+msgstr "週六"
+
 #: src/components/AskCard.tsx
 #: src/components/PasskeySettings.tsx
 #: src/components/teach/SkillDraftCard.tsx
@@ -5155,6 +5197,10 @@ msgstr "訂閱"
 msgid "Subscription required"
 msgstr "需要訂閱"
 
+#: src/lib/cron.ts
+msgid "Sunday"
+msgstr "週日"
+
 #: src/pages/model-settings/compatible-model-fields.tsx
 #: src/pages/Onboarding.tsx
 msgid "Supports images"
@@ -5405,6 +5451,10 @@ msgstr "此訂閱登入在 Rakazo 中尚不可用。請使用部署憑證或選�
 msgid "This week"
 msgstr "本週"
 
+#: src/lib/cron.ts
+msgid "Thursday"
+msgstr "週四"
+
 #: src/pages/RoutineSchedule.tsx
 msgid "Time of day"
 msgstr "時間"
@@ -5513,6 +5563,10 @@ msgstr "重試"
 #: src/lib/model-connection-preflight.ts
 msgid "Try the test again."
 msgstr "請重試測試。"
+
+#: src/lib/cron.ts
+msgid "Tuesday"
+msgstr "週二"
 
 #: src/pages/shell/bot-credentials.tsx
 msgid "Type"
@@ -5770,14 +5824,23 @@ msgstr "Webhook"
 msgid "Website login"
 msgstr "網站登入"
 
+#: src/lib/cron.ts
+msgid "Wednesday"
+msgstr "週三"
+
 #: src/lib/billing.ts
 msgid "week"
 msgstr "週"
 
+#: src/lib/cron.ts
 #: src/pages/RoutineEditor.tsx
 #: src/pages/RoutineSchedule.tsx
 msgid "Weekdays"
 msgstr "工作日"
+
+#: src/lib/cron.ts
+msgid "Weekends"
+msgstr "週末"
 
 #: src/components/SignupSurvey.tsx
 msgid "Welcome to Rakazo"
