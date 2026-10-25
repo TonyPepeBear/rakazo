@@ -2767,7 +2767,7 @@ msgstr "從"
 #. placeholder {0}: filters.dateRange.from
 #: src/pages/ActivityList.tsx
 msgid "From {0}"
-msgstr "來自 {0}"
+msgstr "自 {0} 起"
 
 #: src/pages/WindowChrome.tsx
 msgid "Fullscreen"
@@ -5479,7 +5479,7 @@ msgstr "到"
 #. placeholder {0}: filters.dateRange.to
 #: src/pages/ActivityList.tsx
 msgid "To {0}"
-msgstr "傳送給 {0}"
+msgstr "截至 {0}"
 
 #: src/lib/ticket-status.ts
 msgid "To do"
