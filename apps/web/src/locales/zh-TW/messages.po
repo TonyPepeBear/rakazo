@@ -127,6 +127,10 @@ msgstr "{botName} 的電腦"
 msgid "{commandVariable} is reserved and cannot be used as a command variable. Choose another name."
 msgstr "{commandVariable} 是保留名稱，不能用作命令變數。請選擇其他名稱。"
 
+#: src/components/markdown-copy.tsx
+msgid "{count, plural, one {# row} other {# rows}}"
+msgstr "{count, plural, one {# 列} other {# 列}}"
+
 #: src/lib/billing.ts
 msgid "{count} days"
 msgstr "{count} 天"
@@ -147,6 +151,14 @@ msgstr "{count} 年"
 msgid "{days}d ago"
 msgstr "{days} 天前"
 
+#: src/components/markdown-copy.tsx
+msgid "{from}–{to} of {total} rows"
+msgstr "第 {from}–{to} 列，共 {total} 列"
+
+#: src/components/markdown-copy.tsx
+msgid "{header}, column {index}"
+msgstr "{header}，第 {index} 欄"
+
 #: src/components/ToolActivityDisclosure.tsx
 msgid "{hidden, plural, one {+# earlier step} other {+# earlier steps}}"
 msgstr "{hidden, plural, one {還有 # 個先前步驟} other {還有 # 個先前步驟}}"
@@ -154,6 +166,10 @@ msgstr "{hidden, plural, one {還有 # 個先前步驟} other {還有 # 個先�
 #: src/lib/relative-time.ts
 msgid "{hours}h ago"
 msgstr "{hours} 小時前"
+
+#: src/components/markdown-copy.tsx
+msgid "{label}, empty"
+msgstr "{label}，空白"
 
 #: src/lib/relative-time.ts
 msgid "{minutes}m ago"
@@ -1284,6 +1300,10 @@ msgstr "關閉面板"
 msgid "Close preview"
 msgstr "關閉預覽"
 
+#: src/components/markdown-copy.tsx
+msgid "Close table"
+msgstr "關閉表格"
+
 #: src/pages/SettingsOverlay.tsx
 msgid "Close user settings"
 msgstr "關閉使用者設定"
@@ -1322,6 +1342,10 @@ msgstr "顏色"
 #: src/pages/shell/avatar-studio-popover.tsx
 msgid "Color {color}"
 msgstr "顏色 {color}"
+
+#: src/components/markdown-copy.tsx
+msgid "column {index}"
+msgstr "第 {index} 欄"
 
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Comfortable"
@@ -1551,6 +1575,7 @@ msgid "Conversations"
 msgstr ""
 
 #: src/components/ComputersUnavailableHint.tsx
+#: src/components/markdown-copy.tsx
 #: src/pages/model-settings/connection-controls.tsx
 #: src/pages/Onboarding.tsx
 #: src/pages/shell/agent-import.tsx
@@ -1567,9 +1592,21 @@ msgstr "複製"
 msgid "Copy .env example"
 msgstr "複製 .env 範例"
 
+#: src/components/markdown-copy.tsx
+msgid "Copy code"
+msgstr "複製程式碼"
+
+#: src/components/markdown-copy.tsx
+msgid "Copy diagram source"
+msgstr "複製圖表原始碼"
+
 #: src/pages/shell/agent-import.tsx
 msgid "Copy prompt"
 msgstr ""
+
+#: src/components/markdown-copy.tsx
+msgid "Copy rows"
+msgstr "複製列"
 
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "Cost"
@@ -2389,6 +2426,10 @@ msgstr "下載 {0}"
 msgid "Download {name}"
 msgstr "下載 {name}"
 
+#: src/components/markdown-copy.tsx
+msgid "Download CSV"
+msgstr "下載 CSV"
+
 #: src/components/DesktopUpdates.tsx
 msgid "Downloading…"
 msgstr "下載中…"
@@ -2562,6 +2603,10 @@ msgstr "展開 {0}"
 #: src/pages/shell/message-view.tsx
 msgid "Expand {label}"
 msgstr "展開 {label}"
+
+#: src/components/markdown-copy.tsx
+msgid "Expand table"
+msgstr "展開表格"
 
 #: src/components/CloudAgentCard.tsx
 msgid "expired"
@@ -3230,6 +3275,10 @@ msgstr "標為未讀"
 msgid "Mark as Unread"
 msgstr "標為未讀"
 
+#: src/components/markdown-copy.tsx
+msgid "Markdown table"
+msgstr "Markdown 表格"
+
 #: src/pages/model-settings/compatible-model-fields.tsx
 #: src/pages/Onboarding.tsx
 msgid "Max"
@@ -3611,6 +3660,10 @@ msgstr "新增空間"
 msgid "New ticket"
 msgstr "新增工作項目"
 
+#: src/components/markdown-copy.tsx
+msgid "Next page"
+msgstr "下一頁"
+
 #: src/pages/SettingsOverlay.tsx
 msgid "Next settings sections"
 msgstr "下一組設定區段"
@@ -3695,6 +3748,10 @@ msgstr "找不到遠端 MCP 伺服器"
 #: src/pages/SpaceSearch.tsx
 msgid "No results"
 msgstr "無結果"
+
+#: src/components/markdown-copy.tsx
+msgid "No rows"
+msgstr "沒有資料列"
 
 #: src/pages/ActivityList.tsx
 msgid "No runs match these filters."
@@ -3920,6 +3977,10 @@ msgstr "輸出"
 msgid "Owner"
 msgstr "擁有者"
 
+#: src/components/markdown-copy.tsx
+msgid "Page {page} of {count}"
+msgstr "第 {page} 頁，共 {count} 頁"
+
 #: src/pages/RoutineEditor.tsx
 msgid "PagerDuty incident"
 msgstr "PagerDuty 事件"
@@ -4072,6 +4133,10 @@ msgstr "預覽 {0}"
 #: src/pages/Artifacts.tsx
 msgid "Preview isn't available for this file type — download it to view it."
 msgstr "此檔案類型無法預覽，請下載後檢視。"
+
+#: src/components/markdown-copy.tsx
+msgid "Previous page"
+msgstr "上一頁"
 
 #: src/pages/SettingsOverlay.tsx
 msgid "Previous settings sections"
@@ -4515,6 +4580,10 @@ msgstr "例行任務"
 msgid "Routines that run while you're away"
 msgstr "在你離線時執行的例行任務"
 
+#: src/components/markdown-copy.tsx
+msgid "Row"
+msgstr "列"
+
 #: src/pages/RoutineEditor.tsx
 msgid "Run at"
 msgstr "執行時間"
@@ -4951,6 +5020,22 @@ msgstr ""
 msgid "Something you chose cannot work here. Untick it and try again."
 msgstr ""
 
+#: src/components/markdown-copy.tsx
+msgid "Sort by {column}"
+msgstr "依 {column} 排序"
+
+#: src/components/markdown-copy.tsx
+msgid "Sort cleared"
+msgstr "已清除排序"
+
+#: src/components/markdown-copy.tsx
+msgid "Sorted by {column}, ascending"
+msgstr "已依 {column} 遞增排序"
+
+#: src/components/markdown-copy.tsx
+msgid "Sorted by {column}, descending"
+msgstr "已依 {column} 遞減排序"
+
 #: src/lib/identity-display.ts
 #: src/pages/SettingsOverlay.tsx
 msgid "Space"
@@ -5095,6 +5180,10 @@ msgstr "正在切換…"
 #: src/pages/AccountSettingsOverlay.tsx
 msgid "System"
 msgstr "系統"
+
+#: src/components/markdown-copy.tsx
+msgid "Table"
+msgstr "表格"
 
 #: src/pages/shell/computer-overlay.tsx
 msgid "Take control"
