@@ -125,7 +125,10 @@ test("settings preflight distinguishes a stored API key from sign-in", async ({
   await expect(catalogAlert).toContainText("was not listed");
   await expect(settings.getByText("Models list OK")).toHaveCount(0);
 
-  await page.keyboard.press("Escape");
+  await page
+    .getByTestId("model-connection")
+    .getByRole("button", { name: "Close", exact: true })
+    .click();
   await expect(settings).toBeHidden();
   settings = await openModelConnection(page, "Anthropic");
   await expect(settings.getByRole("button", { name: "Test connection" })).toBeDisabled();
@@ -138,7 +141,7 @@ test("settings preflight distinguishes a stored API key from sign-in", async ({
   settings = await manageModelConnection(page, "Anthropic");
   await expect(settings.getByRole("button", { name: "Disconnect", exact: true })).toBeVisible();
   await expect(settings.getByRole("button", { name: "Sign in again" })).toHaveCount(0);
-  await expect(settings.getByRole("button", { name: "Sign in with Claude Pro/Max" })).toBeVisible();
+  await expect(settings.getByRole("button", { name: "Sign in with Claude" })).toBeVisible();
   await expect(settings.getByRole("button", { name: "Test connection" })).toBeDisabled();
   await captureScreenshot(page, testInfo, "settings-preflight-api-key");
 });

@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
 import { i18n } from "@lingui/core";
-import type { ModelCatalogEntry, ModelRoleSettings as Settings } from "@rakazo/contracts";
+import type { ModelCatalogEntry, ModelRoleView as Settings } from "@rakazo/contracts";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ComponentProps, ReactNode } from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /** Provider rows end with their "Connect" action; models show their name alone. */
-const optionName = (entry: Element) => entry.textContent?.replace(/Connect$/, "");
+const optionName = (entry: Element) => entry.textContent?.replace(/(Connect|Default)$/, "");
 const api = vi.hoisted(() => ({ role: vi.fn(), forRole: vi.fn(), setRole: vi.fn() }));
 vi.mock("../lib/localized-provider-hint", () => ({
   providerDisplayName: (provider: string, name: string, auth?: string) =>
@@ -53,14 +54,18 @@ const jev = { provider: "openrouter", modelId: "typesafe/jev-1.14" };
 const chat = { provider: "openrouter", modelId: "chat" };
 const mini = { provider: "openrouter", modelId: "mini" };
 const deepseek = { id: "deepseek", name: "DeepSeek" };
+/** A pick from a connection runs on that connection. */
+const pin = <T extends object>(choice: T) => ({ ...choice, credentialId: "key" });
 const onConnect = vi.fn();
 const onManage = vi.fn();
 let container: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
 let saved: Settings;
+let queryClient: QueryClient;
 const props = {
   userId: "user",
   spaceId: "space",
+  scope: "account" as const,
   credentials,
   title: "Main model",
   defaultLabel: "Deployment default",
@@ -70,7 +75,13 @@ const props = {
   onManage,
 };
 async function render(extra: Partial<ComponentProps<typeof ModelRoleSettings>> = {}) {
-  await act(async () => root.render(<ModelRoleSettings {...props} {...extra} />));
+  await act(async () =>
+    root.render(
+      <QueryClientProvider client={queryClient}>
+        <ModelRoleSettings {...props} {...extra} />
+      </QueryClientProvider>,
+    ),
+  );
 }
 function trigger(label: string) {
   return container.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
@@ -114,14 +125,17 @@ beforeEach(() => {
   );
   Element.prototype.scrollIntoView = () => undefined;
   saved = { primary: null, backups: [] };
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   onConnect.mockReset();
   onManage.mockReset();
   api.role.mockReset().mockImplementation(async () => saved);
   api.forRole.mockReset().mockResolvedValue(catalog);
-  api.setRole.mockReset().mockImplementation(async ({ role: _r, expectedUserId: _u, ...patch }) => {
-    saved = { ...saved, ...patch };
-    return saved;
-  });
+  api.setRole
+    .mockReset()
+    .mockImplementation(async ({ role: _r, expectedUserId: _u, scope: _s, ...patch }) => {
+      saved = { ...saved, ...patch };
+      return saved;
+    });
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -142,25 +156,40 @@ describe("shared role editor", () => {
       expect.objectContaining({
         role: "approval",
         expectedUserId: "user",
-        primary: jev,
+        primary: pin(jev),
         backups: [],
       }),
       { context: { spaceId: "space" } },
     );
-    expect(rows()).toEqual(["Jev 1.14· OpenRouter"]);
+    expect(rows()).toEqual(["Jev 1.14OpenRouter"]);
     await menu("Jev 1.14", "Remove");
     expect(saved.primary).toBeNull();
     expect(container.querySelector('[data-testid="model-role-default"]')).not.toBeNull();
+  });
+  it("reopens on the cached list without a spinner while it refreshes", async () => {
+    saved = { primary: chat, backups: [mini] };
+    await render();
+    expect(rows()).toEqual(["ChatOpenRouter", "MiniOpenRouter"]);
+    await act(async () => root.unmount());
+    root = createRoot(container);
+    const hold = new Promise<never>(() => undefined);
+    api.role.mockReturnValue(hold);
+    api.forRole.mockReturnValue(hold);
+    const loads = api.role.mock.calls.length;
+    await render();
+    expect(container.querySelector('[aria-label="Loading model catalog…"]')).toBeNull();
+    expect(rows()).toEqual(["ChatOpenRouter", "MiniOpenRouter"]);
+    expect(api.role.mock.calls.length).toBe(loads + 1);
   });
   it("uses the same add, order and remove controls for main and approval fallbacks", async () => {
     await render();
     await pick("Add fallback", "Chat");
     await pick("Add fallback", "Jev 1.14");
-    expect(saved.backups).toEqual([chat, jev]);
+    expect(saved.backups).toEqual([pin(chat), pin(jev)]);
     await menu("Jev 1.14", "Move up");
-    expect(saved.backups).toEqual([jev, chat]);
+    expect(saved.backups).toEqual([pin(jev), pin(chat)]);
     await menu("Chat", "Remove");
-    expect(saved).toEqual({ primary: null, backups: [jev] });
+    expect(saved).toEqual({ primary: null, backups: [pin(jev)] });
     expect(api.setRole).toHaveBeenLastCalledWith(
       expect.objectContaining({ role: "main" }),
       expect.anything(),
@@ -175,7 +204,11 @@ describe("shared role editor", () => {
       expect.objectContaining({ primary: jev, backups: [chat, mini] }),
       expect.anything(),
     );
-    expect(rows().map((row) => row?.split("·")[0])).toEqual(["Jev 1.14", "Chat", "Mini"]);
+    expect(rows().map((row) => row?.replace(/OpenRouter$/, ""))).toEqual([
+      "Jev 1.14",
+      "Chat",
+      "Mini",
+    ]);
   });
   it("promotes the first fallback when the primary is removed", async () => {
     saved = { primary: chat, backups: [jev, mini] };
@@ -200,11 +233,14 @@ describe("shared role editor", () => {
       expect.anything(),
     );
   });
-  it("resets the approval model to the deployment default and keeps its fallbacks", async () => {
-    saved = { primary: jev, backups: [mini] };
+  it("names the deployment's model and resets to it, keeping the fallbacks", async () => {
+    saved = { primary: jev, backups: [mini], deploymentPrimary: chat };
     await render({ modelRole: "approval", title: "Approval model" });
-    await pick("Change Jev 1.14", "Deployment default");
-    expect(saved).toEqual({ primary: null, backups: [mini] });
+    await pick("Change Jev 1.14", "Chat");
+    expect(saved).toMatchObject({ primary: null, backups: [mini] });
+    expect(container.querySelector('[data-testid="model-role-default"]')?.textContent).toBe(
+      "1ChatOpenRouter",
+    );
   });
   it("leaves a model where the loaded list has it when it is picked again", async () => {
     saved = { primary: chat, backups: [jev] };
@@ -215,7 +251,7 @@ describe("shared role editor", () => {
     api.role.mockImplementationOnce(
       () =>
         new Promise((resolve) => {
-          finish = () => resolve({ primary: mini, backups: [chat, jev] });
+          finish = () => resolve({ primary: pin(mini), backups: [chat, jev] });
         }),
     );
     await render({ credentials: [...credentials] });
@@ -237,7 +273,7 @@ describe("shared role editor", () => {
     saved = { primary: chat, backups: [jev] };
     await render();
     await pick("Change Jev 1.14", "Mini");
-    expect(saved).toEqual({ primary: chat, backups: [mini] });
+    expect(saved).toEqual({ primary: chat, backups: [pin(mini)] });
   });
   it("hands a not-connected provider to the connect flow and reopens its models once connected", async () => {
     saved = { primary: chat, backups: [] };
@@ -310,7 +346,7 @@ describe("shared role editor", () => {
     await render({ thinking: true });
     expect(container.textContent).toContain("Thinking: High");
     await menu("Chat", "Manage OpenRouter");
-    expect(onManage).toHaveBeenCalledWith("openrouter");
+    expect(onManage).toHaveBeenCalledWith("openrouter", "key");
     await click(trigger("Jev 1.14 options"));
     expect(
       [...document.querySelectorAll('[role="menuitem"]')].map((entry) => entry.textContent),
@@ -331,7 +367,12 @@ describe("shared role editor", () => {
       ),
     );
     expect(api.setRole).toHaveBeenLastCalledWith(
-      { role: "main", expectedUserId: "user", primary: { ...chat, thinkingLevel: "low" } },
+      {
+        role: "main",
+        expectedUserId: "user",
+        scope: "account",
+        primary: { ...chat, thinkingLevel: "low" },
+      },
       expect.anything(),
     );
   });
@@ -353,7 +394,7 @@ describe("shared role editor", () => {
     api.setRole.mockRejectedValueOnce(new Error("save failed"));
     await render();
     await menu("Chat", "Remove");
-    expect(rows()).toEqual(["Chat· OpenRouter"]);
+    expect(rows()).toEqual(["ChatOpenRouter"]);
     expect(container.querySelector('[role="alert"]')?.textContent).toContain("save failed");
   });
 });
@@ -385,9 +426,73 @@ it("names rows and menus by their connection", async () => {
       },
     ],
   });
-  expect(rows()).toEqual(["Claude· Claude subscription"]);
+  expect(rows()).toEqual(["ClaudeClaude subscription"]);
   await click(trigger("Claude options"));
   expect(
     [...document.querySelectorAll('[role="menuitem"]')].map((entry) => entry.textContent),
   ).toContain("Manage Claude subscription");
+});
+
+it("groups models by connection and runs the same model on either account", async () => {
+  const work = {
+    id: "work",
+    provider: "openrouter",
+    label: "Work",
+    isDefault: false,
+    hasKey: true,
+  };
+  saved = { primary: pin(chat), backups: [] };
+  await render({ credentials: [...credentials, work] });
+  expect(rows()).toEqual(["ChatOpenRouter"]);
+  await click(trigger("Add fallback"));
+  expect(
+    [...document.querySelectorAll("[cmdk-group-heading]")].map((entry) => entry.textContent),
+  ).toEqual(["OpenRouter", "OpenRouter (Work)"]);
+  const workChat = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+    (entry) =>
+      optionName(entry) === "Chat" &&
+      entry.closest("[cmdk-group]")?.textContent?.startsWith("OpenRouter (Work)"),
+  );
+  await click(workChat);
+  expect(saved).toEqual({
+    primary: pin(chat),
+    backups: [{ ...chat, credentialId: "work" }],
+  });
+  expect(rows()).toEqual(["ChatOpenRouter", "ChatOpenRouter (Work)"]);
+  await menu("Chat", "Manage OpenRouter");
+  expect(onManage).toHaveBeenLastCalledWith("openrouter", "key");
+});
+
+it("reads and saves a Space's own list without mixing it with the account's", async () => {
+  const lists: Record<string, Settings> = {
+    account: { primary: pin(chat), backups: [] },
+    space: { primary: pin(mini), backups: [] },
+  };
+  api.role.mockImplementation(async ({ scope }: { scope: string }) => lists[scope]);
+  api.setRole.mockImplementation(
+    async ({ role: _r, expectedUserId: _u, scope, ...patch }: Record<string, unknown>) => {
+      lists[scope as string] = { ...lists[scope as string]!, ...patch };
+      return lists[scope as string];
+    },
+  );
+  await render({ scope: "space" });
+  await vi.waitFor(() => expect(rows()).toEqual(["MiniOpenRouter"]));
+  expect(api.role).toHaveBeenLastCalledWith(
+    { role: "main", expectedUserId: "user", scope: "space" },
+    { context: { spaceId: "space" } },
+  );
+  // Which models a role can use does not depend on whose list it is.
+  expect(api.forRole).toHaveBeenLastCalledWith(
+    { role: "main", expectedUserId: "user" },
+    { context: { spaceId: "space" } },
+  );
+  await pick("Add fallback", "Jev 1.14");
+  expect(api.setRole).toHaveBeenLastCalledWith(
+    expect.objectContaining({ scope: "space", backups: [pin(jev)] }),
+    { context: { spaceId: "space" } },
+  );
+  expect(lists.account).toEqual({ primary: pin(chat), backups: [] });
+
+  await render({ scope: "account" });
+  await vi.waitFor(() => expect(rows()).toEqual(["ChatOpenRouter"]));
 });

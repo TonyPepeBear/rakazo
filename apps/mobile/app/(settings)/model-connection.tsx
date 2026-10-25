@@ -3,6 +3,7 @@ import {
   CLOUDFLARE_AI_GATEWAY_PROVIDER_ID,
   cloudflareModelRouting,
   compatibleConnectionName,
+  connectionDisplayName,
   DEFAULT_MODEL_CONTEXT_WINDOW,
   DEFAULT_MODEL_MAX_TOKENS,
   isCloudflareModelProvider,
@@ -31,7 +32,7 @@ import {
 } from "@rakazo/core";
 import * as Clipboard from "expo-clipboard";
 import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from "expo-router";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -52,7 +53,6 @@ import { NativeSwitch } from "../../components/native-switch";
 import { Checkmark } from "../../components/row-accessories";
 import { SettingsRow } from "../../components/settings-group";
 import type { MobileMe, MobileModel, MobileModelCredential } from "../../lib/api";
-import { rpc } from "../../lib/api";
 import { mobileTokens } from "../../lib/appearance";
 import { useI18n } from "../../lib/i18n";
 import {
@@ -62,6 +62,7 @@ import {
 } from "../../lib/model-auth";
 import { modelConnectionRequest } from "../../lib/model-connection-request";
 import { native, useThemedStyles } from "../../lib/native";
+import { ACCOUNT_SETTINGS, settingsRpc } from "../../lib/settings-target";
 import { thinkingLevelLabel } from "../../lib/thinking-level";
 import { errorText } from "../../lib/user-error";
 
@@ -95,6 +96,13 @@ export default function ModelConnection() {
   const { requestId = "" } = useLocalSearchParams<{ requestId?: string }>();
   const [request] = useState(() => modelConnectionRequest(requestId));
   const makeDefault = request?.makeDefault ?? false;
+  const target = request?.target ?? ACCOUNT_SETTINGS;
+  // A Space's override connects through that Space, where makeDefault and sign-in apply.
+  const rpc = useMemo(() => settingsRpc(target), [target]);
+  // A new connection is managed by its id once it is saved, so later saves update it.
+  const [credentialId, setCredentialId] = useState(request?.credentialId ?? null);
+  const credentialIdRef = useRef(credentialId);
+  credentialIdRef.current = credentialId;
   const { t } = useI18n();
   const [catalog, setCatalog] = useState<MobileModel[]>([]);
   const [credentials, setCredentials] = useState<MobileModelCredential[]>([]);
@@ -176,7 +184,7 @@ export default function ModelConnection() {
       setOauthPending(false);
     });
     if (loginId) void rpc("models/cancelOAuth", { loginId }).catch(() => undefined);
-  }, []);
+  }, [rpc]);
 
   const cancelInFlightWork = useCallback(() => {
     modelProbe.invalidate();
@@ -201,11 +209,7 @@ export default function ModelConnection() {
         rpc<MobileModelCredential[]>("models/credentials"),
       ]);
       const nextProvider = request.provider;
-      const nextCredential = nextCredentials.find(
-        (entry) =>
-          entry.provider === nextProvider &&
-          (!request.baseUrl || entry.baseUrl === request.baseUrl),
-      );
+      const nextCredential = nextCredentials.find((entry) => entry.id === credentialIdRef.current);
       const nextModel =
         nextProvider === OPENAI_COMPATIBLE_PROVIDER_ID
           ? preferred.modelId?.trim() ||
@@ -256,7 +260,7 @@ export default function ModelConnection() {
       setGatewayId(nextCredential?.gatewayId ?? "");
       return nextMe;
     },
-    [request, t],
+    [request, rpc, t],
   );
 
   useFocusEffect(
@@ -274,10 +278,11 @@ export default function ModelConnection() {
 
   const modelsForProvider = catalog.filter((entry) => entry.provider === provider);
   const selected = modelsForProvider.find((entry) => entry.id === modelId) ?? modelsForProvider[0];
-  const selectedProviderLabel = compatibleConnectionName(
-    baseUrl,
-    selected?.providerName ?? selected?.provider ?? "",
-  );
+  const credential = credentials.find((entry) => entry.id === credentialId);
+  const providerName = selected?.providerName ?? selected?.provider ?? "";
+  const selectedProviderLabel = credential
+    ? connectionDisplayName(credential, providerName)
+    : compatibleConnectionName(baseUrl, providerName);
   useLayoutEffect(() => {
     if (selectedProviderLabel) navigation.setOptions({ title: selectedProviderLabel });
   }, [navigation, selectedProviderLabel]);
@@ -286,7 +291,6 @@ export default function ModelConnection() {
   const isCloudflare = isCloudflareModelProvider(provider);
   const cloudflareRoutingReady =
     !isCloudflare || cloudflareModelRouting({ provider, accountId, gatewayId }) !== undefined;
-  const credential = credentials.find((entry) => entry.provider === provider);
   const compatibleRows = compatibleModelRows(
     savedCompatibleModelIds(credential, baseUrl),
     enabledModelIds,
@@ -367,11 +371,9 @@ export default function ModelConnection() {
     clearFeedback();
     setPending("disconnect");
     try {
-      await rpc("models/disconnect", { provider: selected.provider });
+      await rpc("models/disconnect", { provider: selected.provider, credentialId: credential.id });
       publishFeedback("connection", {
-        notice: t("Disconnected {provider}.", {
-          provider: selected.providerName ?? selected.provider,
-        }),
+        notice: t("Disconnected {provider}.", { provider: selectedProviderLabel }),
       });
       router.back();
     } catch (err) {
@@ -458,7 +460,7 @@ export default function ModelConnection() {
     if (isOpenAiCompatible && parsedMaxTokens === undefined) return;
     setPending("connect");
     try {
-      await rpc(
+      const saved = await rpc<MobileModelCredential>(
         "models/connect",
         isOpenAiCompatible
           ? {
@@ -475,8 +477,10 @@ export default function ModelConnection() {
               supportsImages,
               maxImagesPerPrompt: maxImagesPerPromptInput,
               makeDefault,
+              scope: target.scope,
               apiKey: apiKey.trim() || undefined,
               label: selected.providerName ?? selected.provider,
+              credentialId: credentialIdRef.current,
             }
           : {
               provider: selected.provider,
@@ -488,12 +492,16 @@ export default function ModelConnection() {
               // null, so the previous model's effort is not reused.
               ...(!savingLimitOnly || modelChanged ? { thinkingLevel: stagedThinking } : {}),
               makeDefault,
+              scope: target.scope,
               maxTokens: parsedMaxTokens ?? null,
               label: selected.providerName ?? selected.provider,
+              credentialId: credentialIdRef.current,
             },
       );
+      credentialIdRef.current = saved.id;
+      setCredentialId(saved.id);
       if (!limitsOnly) setApiKey("");
-      if (!savingLimitOnly && (await finishConnecting(activeModelId))) return;
+      if (!savingLimitOnly && (await finishConnecting(activeModelId, saved.id))) return;
       await load({ modelId });
       publishFeedback(anchor, { notice: t("Saved.") });
     } catch (err) {
@@ -506,22 +514,35 @@ export default function ModelConnection() {
   }
 
   async function finishSubscriptionSignIn(loginId: string, controller: AbortController) {
-    await waitForModelOAuth(loginId, controller.signal);
+    await waitForModelOAuth(loginId, controller.signal, rpc);
     if (controller.signal.aborted) return;
-    await rpc("models/finishOAuth", { loginId }, { signal: controller.signal });
+    const saved = await rpc<MobileModelCredential>(
+      "models/finishOAuth",
+      { loginId },
+      { signal: controller.signal },
+    );
     if (controller.signal.aborted) return;
     oauthLoginIdRef.current = null;
+    credentialIdRef.current = saved.id;
+    setCredentialId(saved.id);
     setOauth(null);
-    if (await finishConnecting(selected?.id ?? modelId)) return;
+    if (await finishConnecting(selected?.id ?? modelId, saved.id)) return;
     await load({ modelId });
     if (controller.signal.aborted) return;
     publishFeedback("connection", { notice: t("Saved.") });
   }
 
-  /** A connect started from a picker continues in that slot's picker for this provider. */
-  async function finishConnecting(connectedModelId: string): Promise<boolean> {
+  /** A connect started from a picker continues in that slot's picker for this connection. */
+  async function finishConnecting(
+    connectedModelId: string,
+    connectedCredentialId: string,
+  ): Promise<boolean> {
     if (!request?.onConnected || !connectedModelId) return false;
-    const next = await request.onConnected({ provider, modelId: connectedModelId });
+    const next = await request.onConnected({
+      provider,
+      modelId: connectedModelId,
+      credentialId: connectedCredentialId,
+    });
     if (next) router.replace(next);
     else router.back();
     return true;
@@ -545,7 +566,10 @@ export default function ModelConnection() {
             selected.thinkingLevels,
           ) as ThinkingLevel | null,
           makeDefault,
+          scope: target.scope,
           label: selected.providerName ?? selected.provider,
+          credentialId: credentialIdRef.current,
+          codePage: true,
         },
         { signal: controller.signal },
       );
@@ -1018,17 +1042,13 @@ export default function ModelConnection() {
                   <Pressable onPress={() => void Linking.openURL(oauth.verificationUri)}>
                     <Text style={styles.link}>{oauth.verificationUri}</Text>
                   </Pressable>
-                  <Text style={styles.secondary}>
-                    {t("The final page may not load. Paste its URL or code here.")}
-                  </Text>
+                  <Text style={styles.secondary}>{t("Then paste the code here.")}</Text>
                   <TextInput
                     accessibilityLabel={t("Authorization code")}
                     value={pasteCode}
                     onChangeText={setPasteCode}
                     autoCapitalize="none"
                     autoCorrect={false}
-                    placeholder={t("http://localhost:53692/callback?code=…")}
-                    placeholderTextColor={native.secondaryLabel}
                     style={[styles.keyInput, styles.nestedInput]}
                   />
                   <NativeActionButton
@@ -1195,9 +1215,8 @@ export default function ModelConnection() {
         fill={false}
         label={pending === "disconnect" ? t("Disconnecting…") : t("Disconnect")}
         onPress={() => {
-          const name = selected?.providerName ?? selected?.provider ?? "";
           Alert.alert(
-            t("Disconnect {name}?", { name }),
+            t("Disconnect {name}?", { name: selectedProviderLabel }),
             t("This removes the connection from every space."),
             [
               { text: t("Cancel"), style: "cancel" },

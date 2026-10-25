@@ -1,15 +1,22 @@
-import type { ModelBackupChoice } from "@rakazo/contracts";
+import type { ModelRoleChoice } from "@rakazo/contracts";
 import type { Href } from "expo-router";
+import type { SettingsTarget } from "./settings-target";
 
 export type ModelConnectionRequest = {
   provider: string;
+  /** The connection to manage, or null to add another one for the provider. */
+  credentialId: string | null;
   /** Prefills an OpenAI-compatible endpoint, such as the Ollama Cloud preset. */
   baseUrl?: string;
   /** Only the main model's empty first slot takes the new connection's model on connect. */
   makeDefault: boolean;
-  /** Set when connecting fills a model slot; managing a connection leaves it unset. */
-  /** May return the screen to continue in, such as the slot's picker for this provider. */
-  onConnected?: (choice: ModelBackupChoice) => Promise<Href | undefined>;
+  /** Whose main model makeDefault sets: the account's, or a Space's override. */
+  target: SettingsTarget;
+  /**
+   * Set when connecting fills a model slot; managing a connection leaves it unset.
+   * May return the screen to continue in, such as the slot's picker for this connection.
+   */
+  onConnected?: (choice: ModelRoleChoice) => Promise<Href | undefined>;
 };
 
 let nextId = 0;

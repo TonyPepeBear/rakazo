@@ -14,6 +14,7 @@ import {
   openModelConnection,
   openUserSettings,
   pickReopenedModel,
+  presentMainDeploymentDefault,
   rpc,
   signup,
 } from "./helpers";
@@ -21,6 +22,11 @@ import {
 const LOCAL_MODEL_ID = "rakazo-e2e-local";
 const SECOND_MODEL_ID = "rakazo-e2e-second";
 const LOCAL_MODEL_REPLY = "OpenAI-compatible endpoint verified end to end.";
+
+test.afterEach(async ({ page }) => {
+  // Finish intercepted responses before the browser context is disposed.
+  await page.unrouteAll({ behavior: "wait" });
+});
 
 test("model settings cleanup frames", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -281,8 +287,8 @@ test("the bot's model picker marks models that cannot read images", async ({ pag
   await expect(picker).toBeVisible();
   await picker.click();
   await page.getByRole("combobox", { name: "Search models" }).fill("model");
-  const textOnly = page.getByRole("option", { name: "OpenRouter · Text-only model", exact: true });
-  const vision = page.getByRole("option", { name: "OpenRouter · Vision model 1", exact: true });
+  const textOnly = page.getByRole("option", { name: "Text-only model (OpenRouter)", exact: true });
+  const vision = page.getByRole("option", { name: "Vision model 1 (OpenRouter)", exact: true });
   await expect(textOnly).toBeVisible();
   await captureScreenshot(page, testInfo, "bot-model-picker-text-only-row");
   await page.evaluate(() => {
@@ -490,7 +496,10 @@ test("connects, lists, and uses an OpenAI-compatible endpoint", async ({ page },
     await expect(saved.getByRole("button", { name: "Save", exact: true })).toBeEnabled();
 
     // Closing without saving leaves the stored connection as it was.
-    await page.keyboard.press("Escape");
+    await page
+      .getByTestId("model-connection")
+      .getByRole("button", { name: "Close", exact: true })
+      .click();
     await expect(saved).toBeHidden();
     await page.getByRole("button", { name: "Close model settings" }).click();
     await page.locator("main").getByRole("button", { name: "Chief", exact: true }).click();
@@ -578,9 +587,12 @@ test("model settings connect, replace, and cancel provider authentication", asyn
     {},
   );
   expect(connected.find((entry) => entry.provider === "scripted")?.maxTokens).toBe(8192);
-  await page.keyboard.press("Escape");
+  await page
+    .getByTestId("model-connection")
+    .getByRole("button", { name: "Close", exact: true })
+    .click();
   await expect(limits).toBeHidden();
-  // A limits-only save keeps the dialog open and confirms inside it.
+  // A limits-only save keeps the page open and confirms on it.
   const manage = await manageModelConnection(page, "Scripted");
   await manage.getByText("Advanced", { exact: true }).click();
   await manage.getByLabel("Maximum output tokens").fill("16384");
@@ -664,7 +676,7 @@ test("model settings connect, replace, and cancel provider authentication", asyn
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
 
   const codex = await openModelConnection(page, "ChatGPT subscription", { search: "ChatGPT" });
-  await codex.getByRole("button", { name: /Sign in with ChatGPT Plus\/Pro/ }).click();
+  await codex.getByRole("button", { name: /Sign in with ChatGPT/ }).click();
 
   // The popup is blocked (window.open returned null): the card still carries the
   // code, a copy button, the expiry, and a way to abandon the attempt.
@@ -684,14 +696,17 @@ test("model settings connect, replace, and cancel provider authentication", asyn
   await expect(codex.getByText("TEST-CODE")).toBeHidden();
 
   // A canceled attempt leaves sign-in reusable.
-  await codex.getByRole("button", { name: /Sign in with ChatGPT Plus\/Pro/ }).click();
+  await codex.getByRole("button", { name: /Sign in with ChatGPT/ }).click();
   await expect(codex.getByText("TEST-CODE")).toBeVisible();
 
   // Closing the dialog abandons the attempt.
   const cancelled = page.waitForRequest((request) =>
     request.url().includes("/rpc/models/cancelOAuth"),
   );
-  await page.keyboard.press("Escape");
+  await page
+    .getByTestId("model-connection")
+    .getByRole("button", { name: "Close", exact: true })
+    .click();
   await expect(codex).toBeHidden();
   await cancelled;
   expect(finishRequests).toBe(0);
@@ -699,14 +714,17 @@ test("model settings connect, replace, and cancel provider authentication", asyn
   await manage.getByLabel("Replace API key").fill("fake-scripted-key-three");
   await expect(manage.getByRole("button", { name: "Replace API key" })).toBeEnabled();
   await expect(page.getByText("TEST-CODE")).toBeHidden();
-  await page.keyboard.press("Escape");
+  await page
+    .getByTestId("model-connection")
+    .getByRole("button", { name: "Close", exact: true })
+    .click();
   await expect(manage).toBeHidden();
 
   // A finished sign-in closes the dialog and reopens the picker; the provider no longer
   // offers to connect.
   oauthReady = true;
   await openModelConnection(page, "ChatGPT subscription", { search: "ChatGPT" });
-  await codex.getByRole("button", { name: /Sign in with ChatGPT Plus\/Pro/ }).click();
+  await codex.getByRole("button", { name: /Sign in with ChatGPT/ }).click();
   await expect(codex).toBeHidden();
   const reopened = page.getByRole("combobox", { name: "Search models" });
   await expect(reopened).toBeVisible();
@@ -755,6 +773,11 @@ test("a deployment default on server credentials says so and keeps an own key op
       },
     });
   });
+  await presentMainDeploymentDefault(
+    page,
+    "amazon-bedrock",
+    "eu.anthropic.claude-haiku-4-5-20251001-v1:0",
+  );
   await openUserSettings(page, "models");
   await expect(page.getByTestId("model-role-main").getByTestId("model-role-default")).toContainText(
     "Claude Haiku",
@@ -779,9 +802,10 @@ test("a key connected in another space can replace server credentials for the sa
   const otherSpace = await rpc<{ id: string }>(page, "spaces/create", { name: "Other space" });
   const provider = "amazon-bedrock";
   const modelId = "eu.anthropic.claude-haiku-4-5-20251001-v1:0";
+  // Main models are account-wide, so only the connection is made there.
   const connected = await page.request.post("/rpc/models/connect", {
     headers: { "x-rakazo-space-id": otherSpace.id },
-    data: { json: { provider, modelId, apiKey: "fake-bedrock-key" } },
+    data: { json: { provider, modelId, apiKey: "fake-bedrock-key", makeDefault: false } },
   });
   expect(connected.ok()).toBe(true);
   await page.route("**/rpc/me", async (route) => {
@@ -802,6 +826,7 @@ test("a key connected in another space can replace server credentials for the sa
     await rpc<Array<{ provider: string; id: string; label: string }>>(page, "models/list", {})
   ).find((entry) => entry.provider === provider && entry.id === modelId);
   if (!haiku) throw new Error("catalog has no Bedrock Claude Haiku model");
+  await presentMainDeploymentDefault(page, provider, modelId);
   await openUserSettings(page, "models");
   const mainList = page.getByTestId("model-role-main");
   await expect(mainList.getByTestId("model-role-default")).toContainText(/Claude Haiku/);
@@ -970,7 +995,7 @@ test("chat settings search a long model list", async ({ page }, testInfo) => {
   await captureScreenshot(page, testInfo, "chat-settings-model-search-empty");
 
   await search.fill(target.id);
-  const targetLabel = `${target.providerName ?? target.provider} · ${target.label}`;
+  const targetLabel = `${target.label} (${target.providerName ?? target.provider})`;
   await page
     .locator('[data-slot="command-list"]')
     .getByRole("option", { name: targetLabel, exact: true })
@@ -1115,7 +1140,10 @@ test("a Claude subscription folds the key form and bots move to the space defaul
   await dialog.getByRole("button", { name: "Or paste an API key" }).click();
   await expect(dialog.getByLabel("Or paste an API key")).toBeFocused();
   await expect(dialog.getByRole("button", { name: "Connect API key" })).toBeVisible();
-  await page.keyboard.press("Escape");
+  await page
+    .getByTestId("model-connection")
+    .getByRole("button", { name: "Close", exact: true })
+    .click();
   await expect(dialog).toBeHidden();
 
   await bots.getByRole("button", { name: "Use space default" }).click();
